@@ -1,0 +1,1156 @@
+HOST: http://api.tripomatic.com/v1/{api-key}
+
+--- Tripomatic API (v1) ---
+
+---
+##About
+
+The API is a REST service. Each call lists allowed methods.
+
+
+Result is returned as JSON. Result always contains “status” key with either “ok” or “error”. The result also contains “status_code” - which is for application use and “status_message” - which is intended to be shown to the user.
+
+Please note that the HTTP status reflects the “status”. HTTP 200 code is issued for “ok” requests, 403 for unauthorized, and other codes are used conversely. The JSON returned however still contains “status_code” and “status_message”. The contents of status_message is intended to be shown to the user. The field is empty when no such action is required. It may however contain useful information helping the user troubleshoot, i.e. when a copy of the trip has been created as a result of a saving conflict or when the user is no longer authenticated.
+
+<table>
+    <tr>
+        <th>status</th>
+        <td>“ok” or “error”</td>
+    </tr>
+     <tr>
+        <th>status_code </th>
+        <td>machine interpretable information</td>
+    </tr>
+     <tr>
+        <th>status_message</th>
+        <td>message to be shown to the user</td>
+    </tr>
+</table>
+
+
+In rare cases, such as overload or maintenance, server may also reply with a server error (500 or 503). This, along with a timeout or network failure, should be considered a backend error and the request should be considered as failed. User should be shown a message e.g. “Unable to connect to Tripomatic.com, try again later”.
+
+###Naming conventions
+
+<table>
+    <tr>
+    <th>KEY    <td>key identifying the user in requests
+    <tr>
+    <th>trips    <td>all trips of a user
+    <tr>
+    <th>trip    <td>individual trip. Trip consists of 1 or more days
+    <tr>
+    <th>destinations    <td>destinations in the trip
+    <tr>
+    <th>days    <td>activities for a given day
+    <tr>
+    <th>activity    <td>a single activity, such as visiting the Tower Bridge (“poi:658”)
+</table>
+
+###Activity types
+
+There can be many different activity types and the client must assume that there will be more in the future. For the purpose of the API, however:
+all activities have a guid, a name and a description (can be empty, though!)
+most activities have location information - lat, lng
+some activities may have additional information, such as transport
+images can be queried using the image API
+
+Activity GUID is always contains a type of an activity followed by a collon (e.g. “c:9972#14”). Some important activity types:
+<table>
+    <tr><th>poi    <td>point of interest
+    <tr><th>hotel    <td>hotel or other accommodation
+    <tr><th>c    <td>custom activity
+    <tr><th>transport    <td>transportation point
+    <tr><th>tour    <td>a tour
+    <tr><th>carhire    <td>car hire
+</table>
+---
+
+--
+User authentication
+--
+
+During authentication, the client is issued a key which is then used to access client data via REST API. Authentication itself is web based.
+
+Application should present contents of this URL to the user. User is given option to sign in or sign up using all methods supported on Tripomatic.com (Google, facebook and Tripomatic.com account at the moment) and after the authentication is complete, application is given a unique key that must be present in all future requests. 
+
+https://www.tripomatic.com/mobile/authenticate-user/?client_id=CLIENT_ID&success_url=SUCCESS_URL
+
+<table>
+    <tr>
+        <th>CLIENT_ID  </th>
+        <td>
+            Name of the client requesting the authentication. This must be a max 16 characters long string and must be consistent for each application. Recommended is domain name, device name or mobile app name. This string is only used internally to identify the client to whom a particular access key has been issued.
+        </td>
+    </tr>
+    <tr>
+        <th>SUCCESS_URL </th>
+        <td>
+            URL to redirect the user after successful authentication. A variable server_key_part is added to the URL with the server part of the key.
+        </td>
+    </tr>
+</table>
+
+The server will respond with HTTP 400 Bad request should any of the parameters be missing from the URL.
+
+After sucessful authentication, the server will redirect to SUCCESS_URL with the key added to the URL:
+
+Example:
+open https://www.tripomatic.com/mobile/authenticate-user/?client_id=iPhone&success_url=http://example.com/success
+webpage handles sign in / sign up, when done
+HTTP redirect to http://example.com/success?key=a8f1dec54sUfg3b%@Hg^%f$drjPsdVw%
+
+the key is a8f1dec54sUfg3b%@Hg^%f$drjPsdVw%
+
+The resulting key is always 32 characters long.
+
+In theory, authentication should never fail. In case the user fails to authenticate, the authentication dialog is shown again. Client must implement its own mechanism to cancel authentication (e.g. a back button).
+
+The key (further referred as KEY) is unique for each user. A key does not expire, it may however be changed when e.g. user changes the password. Client must fallback to authenticating user again when it receives an INVALID_KEY error in further communication.
+
+##Sign out
+
+When already authenticated user requests authentication URL again, sign out button is displayed. 
+
+Both CLIENT_ID and SUCCESS_URL params must be set, otherwise HTTP 400 Bad request is returned.
+
+Signout is done after click on Signout out button. After sucessful sign out, the server will redirect to SUCCESS_URL with the key added to the URL, but the key will have no value.
+GET https://www.tripomatic.com/mobile/authenticate-user/?client_id=CLIENT_ID&success_url=SUCCESS_URL
+< 200
+
+--
+Activities in bounds API
+API responds with a JSON with array of POIs data in given bounds.
+
+Properties: guid, name, name_translated, perex, rating, lat, lng, img_thumb_url are always present in response
+
+TODO: hotely, airporty, pridavani dalsich polozek
+
+
+
+SW - Comma separated latitude and longitude of south-west corner<br>
+NE - Comma separated latitude and longitude of north-east corner<br>
+TYPE (optional - default = poi) values {poi,hotel,airport}
+
+BOUNDS LIMIT: Diagonal distance between bounds corners can not exceed ??km otherwise API response with 400 Bad Request
+--
+
+##DRAFT - works only for activities
+GET /activities/in-bounds/{?sw,ne,type}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": [
+       {
+            "guid": "poi:6136",
+            "name": "Vila Tugendhat",
+            "name_translated": "Tugendhat Villa",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.207224",
+            "lng": "16.615877",
+            "perex": "One of the most fascinating examples of functionalist architecture designed by the genius Mies van der Rohe. The pure interior of the villa is simply amazing.",
+            "rating": "8.67"
+        },
+        {
+            "guid": "poi:18154",
+            "name": "Náměstí svobody",
+            "name_translated": "Freedom Square",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.194942",
+            "lng": "16.608533",
+            "perex": "This large and rather quiet square is the heart of the city and a favourite meeting point. See the plague column and original stone clock.",
+            "rating": "9.5"
+        },
+        {
+            "guid": "poi:18139",
+            "name": "Moravská galerie",
+            "name_translated": "Moravian Gallery",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "perex": "Features several buildings filled with intriguing exhibits. The permanent collection showcases six centuries of European art.",
+            "lat": "49.195493",
+            "lng": "16.604367",
+            "rating": "8"
+        },
+        {
+            "guid": "poi:6202",
+            "name": "Katedrála svatého Petra a Pavla v Brně",
+            "name_translated": "Cathedral of St. Peter and St. Paul in Brno",
+            "perex": "An impressive cathedral situated on top of a hill in a quaint neighborhood surrounded by a pleasant park.",
+            "rating": "9.000",
+            "lat": "49.19103",
+            "lng": "16.607101",
+            "img_thumb_url": "http://farm3.staticflickr.com/2679/4321175142_6d147e04f7_s.jpg"
+        },
+        {
+            "guid": "c:abcxyz#4",
+            "name": "Bláhovka",
+            "name_translated": null,
+            "perex": null,
+            "rating": "9.9999",
+            "lat": "49.19103",
+            "lng": "16.607101",
+            "img_thumb_url": "http://farm3.staticflickr.com/2679/4321175142_6d147e04f7_s.jpg"
+        }
+    ]
+}
+
+--
+Activities in Destinations API
+So far this API returns only POIs
+API responds with a JSON with array of activities data for all activities within destinations specified by DESTINATION_GUID and destination bounds<br>
+--
+
+GET /activities/in-destiation/{destination_guid}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": [
+       {
+            "guid": "poi:6136",
+            "name": "Vila Tugendhat",
+            "name_translated": "Tugendhat Villa",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.207224",
+            "lng": "16.615877",
+            "perex": "One of the most fascinating examples of functionalist architecture designed by the genius Mies van der Rohe. The pure interior of the villa is simply amazing.",
+            "rating": "8.67"
+        },
+        {
+            "guid": "poi:18154",
+            "name": "Náměstí svobody",
+            "name_translated": "Freedom Square",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.194942",
+            "lng": "16.608533",
+            "perex": "This large and rather quiet square is the heart of the city and a favourite meeting point. See the plague column and original stone clock.",
+            "rating": "9.5"
+        },
+        {
+            "guid": "poi:18139",
+            "name": "Moravská galerie",
+            "name_translated": "Moravian Gallery",
+            "img_thumb_url": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "perex": "Features several buildings filled with intriguing exhibits. The permanent collection showcases six centuries of European art.",
+            "lat": "49.195493",
+            "lng": "16.604367",
+            "rating": "8"
+        },
+        {
+            "guid": "poi:6202",
+            "name": "Katedrála svatého Petra a Pavla v Brně",
+            "name_translated": "Cathedral of St. Peter and St. Paul in Brno",
+            "perex": "An impressive cathedral situated on top of a hill in a quaint neighborhood surrounded by a pleasant park.",
+            "rating": "9.000",
+            "lat": "49.19103",
+            "lng": "16.607101",
+            "img_thumb_url": "http://farm3.staticflickr.com/2679/4321175142_6d147e04f7_s.jpg"
+        },
+        {
+            "guid": "c:abcxyz#4",
+            "name": "Bláhovka",
+            "name_translated": null,
+            "perex": null,
+            "rating": "9.9999",
+            "lat": "49.19103",
+            "lng": "16.607101",
+            "img_thumb_url": "http://farm3.staticflickr.com/2679/4321175142_6d147e04f7_s.jpg"
+        }
+    ]
+}
+
+
+--
+Activities Nearby API
+API responds with a JSON with array of activities data around given location.<br>
+LATITUDE values <-90,90><br>
+LONGITUDE values <-180,180><br>
+COUNT values <1,100><br>
+TYPE (optional - default = poi) values {poi,hotel,airport}
+--
+##DRAFT
+GET /activities-nearby/{?lat,lng,count,type}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": [
+       {
+            "guid": "poi:6136",
+            "name": "Tugendhat Villa",
+            "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.207224",
+            "lng": "16.615877",
+            "perex": "One of the most fascinating examples of functionalist architecture designed by the genius Mies van der Rohe. The pure interior of the villa is simply amazing.",
+            "address": "Černopolní 237/45, 613 00 Brno, Czech Republic"
+            "mail": "poi@example.com",
+            "phone": "+34 971 730 775",
+            "rating": "8.67",
+            "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+            "distance": "456",
+            "promo": {
+                "header": "Skip the line",
+                "text": "Bypass the notoriously long queues with skip-the-line access to all 3 levels of the tower.",
+                "link": "http://www.city-discovery.com/paris/tour.php?id=8127"
+            }
+        },
+        {
+            "guid": "poi:18154",
+            "name": "Freedom Square",
+            "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.194942",
+            "lng": "16.608533",
+            "perex": "This large and rather quiet square is the heart of the city and a favourite meeting point. See the plague column and original stone clock.",
+            "address": "Náměstí svobody, Brno"
+            "rating": "9",
+            "distance": "236"
+        }
+    ]
+}
+
+--
+Activity API
+This API enables the client to get information about each activity based on its guid, create own activities and save user notes to POIs and Hotels.
+ACTIVITY_GUID - You need to supply ACTIVITY_GUID which belongs to the user identified by KEY. Otherwise the call will result in a 403 error.
+--
+Get detail data for activity
+
+Fields returned vary for different types of activities. Along with "poi" request, the API returns "local_name", for example.
+
+POI response have some extra fields:
+typical_duration, opening_hours, admission, extended_info, destinations
+GET /activity/{activity_guid}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "200",
+    "data": {
+        "guid": "poi:6548",
+        "type": "poi",
+        "name": "Eiffel Tower",
+        "original_name": "le événement",
+        "description": "Something about activity.",
+        "address": "Namesti Svobody 1",
+        "mail": "poi@example.com",
+        "phone": "+34 971 730 775",
+        "rating": "8.67",
+        "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+        "urls_parsed" : [
+                {
+                    "text": "Wikipedia",
+                    "url": "http://en.wikipedia.org/wiki/Bellver_Castle"
+                },
+                {
+                    "text": "Wikipedia article",
+                    "url": "http://en.wikipedia.org/wiki/Paris_sewers#Museum"
+                }
+            ]
+        "tags": ["tag:1", "tag:5", "tag:7"],
+        "lat": "-48.254965",
+        "lng": "2.24798",
+        "share": false,
+        "user_note": "Something user wrote.",
+        "promo" : {
+            "header": "Skip the line",
+            "text" : "Bypass the notoriously long queues with skip-the-line access to all 3 levels of the tower.",
+            "link": "http://www.city-discovery.com/paris/tour.php?id=8127"
+        }
+     }
+}
+
+Create new custom activity
+##DRAFT
+POST /activity/
+> Content-Type: application/json
+{
+        "type": "custom_poi",
+        "name": "My Event",
+        "description": "Something user wrote.",
+        "address": "Namesti Svobody 1",
+        "mail": "poi@example.com",
+        "phone": "+34 971 730 775",
+        "rating": "8.67",
+        "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+        "tags": ["tag:1", "tag:5", "tag:7"],
+        "lat": "-48.254965",
+        "lng": "2.24798",
+        "share": false
+     }
+< 201
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "201",
+    "data": {
+        "guid": "c:6548#1",
+        "type": "custom_poi",
+        "name": "My Event",
+        "original_name": "le événement",
+        "description": "Something user wrote.",
+        "address": "Namesti Svobody 1",
+        "mail": "poi@example.com",
+        "phone": "+34 971 730 775",
+        "rating": "8.67",
+        "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+        "tags": ["tag:1", "tag:5", "tag:7"],
+        "lat": "-48.254965",
+        "lng": "2.24798"
+     }
+}
+
+Update custom activity or add/update user_note to POI or HOTEL
+##DRAFT
+PUT /activity/
+> Content-Type: application/json
+{
+    "guid": "poi:6548",
+    "type": "poi",
+    "name": "Eiffel Tower",
+    "original_name": "le événement",
+    "description": "Something about activity.",
+    "address": "Namesti Svobody 1",
+    "mail": "poi@example.com",
+    "phone": "+34 971 730 775",
+    "rating": "8.67",
+    "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+    "tags": ["tag:1", "tag:5", "tag:7"],
+    "lat": "-48.254965",
+    "lng": "2.24798",
+    "share": false,
+    "user_note": "Something user wrote."
+}
+< 202
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "202",
+    "data": {
+        "guid": "poi:6548",
+        "type": "poi",
+        "name": "Eiffel Tower",
+        "original_name": "le événement",
+        "description": "Something about activity.",
+        "address": "Namesti Svobody 1",
+        "mail": "poi@example.com",
+        "phone": "+34 971 730 775",
+        "rating": "8.67",
+        "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+        "tags": ["tag:1", "tag:5", "tag:7"],
+        "lat": "-48.254965",
+        "lng": "2.24798",
+        "share": false,
+        "user_note": "Something user wrote."
+    }
+}
+
+Delete custom activity which belongs to user. If activity does't belongs to user (autenticated by KEY) the API will respond by code 403. 
+##DRAFT
+DELETE /activity/{activity_guid}
+< 202
+< Content-Type:application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "202",
+}
+
+--
+Batch Activity API
+This API enables the client to get information about set of activities based on their guids.<br>
+ACTIVITY_GUID - You need to supply list of ACTIVITY_GUID separated by semicolons. API returns array of activity details for activities, whichs data can be accessed for the KEY used in URL.
+--
+
+##DRAFT
+GET /batch-activity/{activity_guids}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "200",
+    "data": [{
+            "guid": "poi:530",
+            "type": "poi",
+            "name": "Eiffel Tower",
+            "original_name": "Tour Eiffel",
+            "description": "The ultimate tourist experience in the ultimate tourist city. Fabulous and dreamy view.",
+            "address": "Port de Conti, 75006 Paris,France",
+            "mail": "poi@example.com",
+            "phone": "+34 971 730 775",
+            "rating": "8.67",
+            "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+            "tags": ["tag:2" ],
+            "lat": "48.858631",
+            "lng": "2.294147",
+            "typical_duration": "0",
+            "opening_hours": "Daily: 9 a.m. to 12:45 a.m.",
+            "admission": "Adult: €8.5, €14 to the summit Children (12-24 years): €7, €12.5 Children (4-11 years): €4, €9.5 The access waiting time to the monument is likely to be over 2 hours.",
+            "extended_info": null,
+            "destinations": [ "country:14", "city:14" ]
+        },
+        {
+            "guid": "poi:532",
+            "type": "poi",
+            "name": "The Orsay Museum",
+            "original_name": "Musée d'Orsay",
+            "description": "Museum famous for its extensive collection of impressionist and post-impressionist masterpieces.",
+            "address": "62 Rue de Lille,75007 Paris,France",
+            "mail": "poi@example.com",
+            "phone": "+34 971 730 775",
+            "rating": "8.67",
+            "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+            "tags": [ "tag:3" ],
+            "lat": "48.860049",
+            "lng": "2.324477",
+            "typical_duration": "0",
+            "opening_hours": "Tue - Sun: 9:30 a.m. - 6 p.m.",
+            "admission": "Full rate: €9.00 Reduced rate: €6.50",
+            "extended_info": null,
+            "destinations": [ "country:14", "city:14" ]
+            "promo": {
+                "header": "Skip the line",
+                "text": "Bypass the notoriously long queues with skip-the-line access to all 3 levels of the tower.",
+                "link": "http://www.city-discovery.com/paris/tour.php?id=8127"
+            }
+        }
+     ]
+}
+
+
+--
+Batch Image API
+API responds with a JSON describing available images and their sizes. All images have a license good for displaying images online on Tripomatic.com. Client is responsible for acting according to the terms of use and displaying attribution information according to the requirements of different providers. There is a limitation of 100 guids per request.
+--
+ACTIVITY_GUIDS is string of guids separated by ‘;’, ex: “poi:1;poi:3;ctr:20;hotel:10001”
+
+Note: Number of requests to this API is limited for each KEY. The limit is good for displaying images on a map or otherwise as used on Tripomatic.com. Excess access however will result in a 403 error and may result to deletion of a key.
+GET /batch-images/{activity_guids}
+< 200
+< Content-Type: application/json
+{
+   "status": "ok",
+   "status_message": "",
+   "status_code": "",
+   "data": {
+       "poi:123": [{
+           "provider": "panoramio",
+           "author": "John Doe",
+           "author_page_url": "http://www.example.com/author",
+           "photo_page_url": "http://www.example.com/photo",
+           "title": "Photo title",
+           "sizes": [{
+               "type": "square",
+               "url": "http://www.example.com/thumb.jpg",
+               "width": "60",
+               "height": "60"
+           }, {
+               "type": "small",
+               "url": "http://www.example.com/small.jpg",
+               "width": "240",
+               "height": "160"
+           }, {
+               "type": "medium",
+               "url": "http://www.example.com/medium.jpg",
+               "width": "500",
+               "height": "333"
+           }],
+       }],
+       "poi:234": [{
+           "provider": "panoramio",
+           "author": "John Doe",
+           "author_page_url": "http://www.example.com/author",
+           "photo_page_url": "http://www.example.com/photo",
+           "title": "Photo title",
+           "sizes": [{
+               "type": "square",
+               "url": "http://www.example.com/thumb.jpg",
+               "width": "60",
+               "height": "60"
+           }, {
+               "type": "small",
+               "url": "http://www.example.com/small.jpg",
+               "width": "240",
+               "height": "160"
+           }, {
+               "type": "medium",
+               "url": "http://www.example.com/medium.jpg",
+               "width": "500",
+               "height": "333"
+           }]
+       }, {
+           "provider": "panoramio",
+           "author": "John Doe",
+           "author_page_url": "http://www.example.com/author",
+           "photo_page_url": "http://www.example.com/photo",
+           "title": "Photo title",
+           "sizes": [{
+               "type": "square",
+               "url": "http://www.example.com/thumb.jpg",
+               "width": "60",
+               "height": "60"
+           }, {
+               "type": "small",
+               "url": "http://www.example.com/small.jpg",
+               "width": "240",
+               "height": "160"
+           }, {
+               "type": "medium",
+               "url": "http://www.example.com/medium.jpg",
+               "width": "500",
+               "height": "333"
+           }]
+       }]
+   }
+}
+
+GET /batch-images/{activity_wrong_guids}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "",
+    "data": {
+        "poi:123": []
+    }
+}
+
+
+--
+Destination API
+This API enables the client to get information about each destination based on its guid
+--
+##DRAFT
+GET /destination/{destination_guid}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": {
+        "guid": "city:1",
+        "name": "London",
+        "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+        "description" : "London is the capital of England and the United Kingdom. It is a global capital of finance, politics, trade, culture and fashion. Let's have a look at this noisy, vivid and multicultural metropolis full of people, energy and ideas. Three or more days in London is a must because the city has several different faces and you should get to know at least some of them. London has been called a world in one city and it were not just empty words.",
+        "lat": "49.194942",
+        "lng": "16.608533",
+        "bounds" : { 
+            "SW" {
+                "lat": "48.194942",
+                "lng": "15.452587"
+            },
+            "NE" {
+                "lat": "50.194942",
+                "lng": "17.452587"
+            }
+        },
+        "map_url" : "http://cdn1.tripomatic.com/persistent/attractions-maps/london-attractions-map-large.jpg",
+        "pdf_guide_url" : "http://guides.tripomatic.com/download/tripomatic-free-city-guide-london.pdf",
+        "promo" : [
+            {
+                "header": "Skip the line",
+                "text" : "Bypass the notoriously long queues with skip-the-line access to all 3 levels of the tower.",
+                "link": "http://www.city-discovery.com/paris/tour.php?id=8127"
+            },
+             {
+                "header": "Skip the line",
+                "text" : "Bypass the notoriously long queues with skip-the-line access to all 3 levels of the tower.",
+                "link": "http://www.city-discovery.com/paris/tour.php?id=8127"
+            }
+        ]
+    }
+}
+
+
+--
+Destinations in bounds API
+API responds with a JSON with array of destinations data in given bounds.
+
+SW - Comma separated latitude and longitude of south-west corner<br>
+NE - Comma separated latitude and longitude of north-east corner<br>
+
+--
+##DRAFT
+In future we will add bounds to every destination
+<pre>
+"bounds" : { 
+        "SW" {
+            "lat": "48.194942",
+            "lng": "15.452587"
+        },
+        "NE" {
+            "lat": "50.194942",
+            "lng": "17.452587"
+        }
+    }
+</pre>
+GET /destinations-in-bounds/{?sw,ne}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": {
+        [
+            {
+                "guid": "city:1",
+                "name": "London",
+                "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+                "lat": "49.194942",
+                "lng": "16.608533"
+            },
+            {
+                "guid": "city:14",
+                "name": "Paris",
+                "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+                "lat": "49.194942",
+                "lng": "16.608533"
+            },
+        ]
+    }
+}
+
+
+--
+Download offline guide API 
+##(In-app purchases)
+API responds with a redirect (code 303) to zip file containing guide<br>
+###Error codes and messages
+<table>
+    <tr><th>400 <td>Missing data in request
+    <tr><th>404 <td>Guide not available
+    <tr><th>404 <td>Buyed guide not available
+    <tr><th>403 <td>Not authorized by store
+    <tr><th>403 <td>Guide not purchuased
+    <tr><th>503 <td>Communication with store failed
+</table>
+
+--
+##IOS
+PRODUCT ID example: com.tripomatic.ios.inapp.newyork<br>POST should contain receipt-data
+example:<br>
+ewoJInNpZ25hdHVyZSIgPSAiQWhndWtDRHpJRVdJL2U3ME5QZW00TVljWG9uNEhLeFBMVGpqblZVeEQ4ZEZGaHowSUFFSkZCZ1hOTHM0OU11Nk5rclFKSExRejR0M2h0eGlOYml3WVpyaDlPb2Rkeng3MUV3WjRBRFJuY3VkMjJ... ...OU1iM05mUVc1blpXeGxjeUk3Q2draWIzSnBaMmx1WVd3dGNIVnlZMmhoYzJVdFpHRjBaU0lnUFNBaU1qQXhNaTB3Tmkwd055QXdOam8wTmpvMU5pQkZkR012UjAxVUlqc0tmUT09IjsKCSJlbnZpcm9ubWVudCIgPSAiU2FuZGJveCI7CgkicG9kIiA9ICIxMDAiOwoJInNpZ25pbmctc3RhdHVzIiA9ICIwIjsKfQ==
+
+
+POST /download-guide/{product_id}
+< 303
+
+
+##Android
+API responds with a redirect (code 303) to zip file containing guide<br>
+PRODUCT ID example: com.tripomatic.android.new.york<br>POST have to contain receipt-data received by app after byuing
+example:<br>
+<pre>
+{ "nonce" : 1836535032137741465,
+  "orders" :
+    [{ "notificationId" : "android.test.purchased",
+       "orderId" : "transactionId.android.test.purchased",
+       "packageName" : "com.example.dungeons",
+       "productId" : "android.test.purchased",
+       "developerPayload" : "bGoa+V7g/yqDXvKRqq+JTFn4uQZbPiQJo4pf9RzJ",
+       "purchaseTime" : 1290114783411,
+       "purchaseState" : 0,
+       "purchaseToken" : "rojeslcdyyiapnqcynkjyyjh" }]
+}
+</pre>
+POST /download-guide/{product_id}
+< 303
+
+
+
+--
+Export locations API
+--
+API responds with a JSON with date of export and URL from where the export can be downloaded. Export file is saved as ZIP.
+GET /export-locations/
+< 200
+< Content-Type: application/json
+{
+   "status": "ok",
+   "status_message": "",
+   "status_code": "",
+   "data": {
+      "date": "2012-07-02 00:00:00",
+      "url": "http://s3-eu-west-1.amazonaws.com/tripomatic-app-locations/2012-07-02.zip"
+   }
+}
+
+
+--
+Image API
+API responds with a JSON describing available images and their sizes. All images have a license good for displaying images online on Tripomatic.com. Client is responsible for acting according to the terms of use and displaying attribution information according to the requirements of different providers.
+<table>
+    <tr>
+        <th>guid <td>Unique photo id
+</table>
+--
+Note: Number of requests to this API is limited for each KEY. The limit is good for displaying images on a map or otherwise as used on Tripomatic.com. Excess access however will result in a 403 error and may result to deletion of a key.
+GET /images/{activity_guid}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "",
+    "data": [
+        {
+            "guid": "image:29162",
+            "provider": "panoramio",
+            "author": "John Doe",
+            "author_page_url": "http://www.example.com/author",
+            "photo_page_url": "http://www.example.com/photo",
+            "title": "Photo title",
+            "sizes": [
+                {
+                    "type": "square",
+                    "url": "http://www.example.com/thumb.jpg",
+                    "width": "60",
+                    "height": "60"
+                },
+                {
+                    "type": "small",
+                    "url": "http://www.example.com/small.jpg",
+                    "width": "240",
+                    "height": "160"
+                },
+                {
+                    "type": "medium",
+                    "url": "http://www.example.com/medium.jpg",
+                    "width": "500",
+                    "height": "333"
+                }
+            ]
+        }
+    ]
+}
+
+
+--
+List Guides API
+API responds with a list of available offline guides
+<table>
+    <tr>
+        <th>{os} (optional)
+        <td>values: ios, android
+        <td>default value is ios
+</table>
+--
+GET /list-guides/{os}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "",
+    "status_message": "",
+    "data": {
+        "com.tripomatic.ios.inapp.berlin": {
+            "image_url": "",
+            "name": "Berlín",
+            "description": "Berlínský guide",
+            "virtual": false,
+            "included_in": [
+                "com.tripomatic.ios.inapp.world",
+                "com.tripomatic.ios.inapp.germany",
+                "com.tripomatic.ios.inapp.berlin"
+            ],
+            "published": "2012-07-10",
+            "size": "7079652",
+            "location": "city:18"
+        },
+        "com.tripomatic.ios.inapp.dresden": {
+            "image_url": "",
+            "name": "Dresden guide",
+            "description": "Dresden guide",
+            "virtual": false,
+            "included_in": [
+                "com.tripomatic.ios.inapp.world",
+                "com.tripomatic.ios.inapp.germany",
+                "com.tripomatic.ios.inapp.dresden"
+            ],
+            "published": "2012-07-10",
+            "size": "2457876",
+            "location": "city:146"
+        },
+        "com.tripomatic.ios.inapp.germany": {
+            "image_url": "",
+            "name": "All germany guides",
+            "description": "",
+            "virtual": true,
+            "included_in": [
+                "com.tripomatic.ios.inapp.world",
+                "com.tripomatic.ios.inapp.germany"
+            ],
+            "published": "2012-07-03"
+            },
+            "com.tripomatic.ios.inapp.world": {
+            "image_url": "",
+            "name": "All guides in a world",
+            "description": "",
+            "virtual": true,
+            "included_in": [
+                "com.tripomatic.ios.inapp.world"
+            ],
+            "published": "2012-07-03"
+        }
+    }
+}
+
+
+--
+Pois around API
+--
+API responds with a JSON with array of GUIDs of POIs with rating above 8 (4 stars) around given location.<br>
+LATITUDE values <-90,90><br>
+LONGITUDE values <-180,180><br>
+COUNT values <1,50><br>
+GET /pois-around{?lat,lng,count}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": [
+        "poi:8686",
+        "poi:8531",
+        "poi:8533",
+        "poi:8532",
+        "poi:8535",
+        "poi:8534",
+        "poi:8536",
+        "poi:8538",
+        "poi:8537",
+        "poi:8539"
+    ]
+}
+
+--
+Pois nearby API
+--
+API responds with a JSON with array of POIs data around given location.<br>
+LATITUDE values <-90,90><br>
+LONGITUDE values <-180,180><br>
+COUNT values <1,50><br>
+GET /pois-nearby{?lat,lng,count}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "200",
+    "status_message": "",
+    "data": [
+       {
+            "guid": "poi:6136"
+            "name": "Tugendhat Villa"
+            "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.207224",
+            "lng": "16.615877",
+            "perex": "One of the most fascinating examples of functionalist architecture designed by the genius Mies van der Rohe. The pure interior of the villa is simply amazing.",
+            "address": "Černopolní 237/45, 613 00 Brno, Czech Republic"
+            "mail": "poi@example.com",
+            "phone": "+34 971 730 775",
+            "rating": "8.67",
+            "urls": "\"Wikipedia\":http://en.wikipedia.org/wiki/Bellver_Castle\n\"Wikipedia article\":http://en.wikipedia.org/wiki/Paris_sewers#Museum",
+            "distance": "456"
+        },
+        {
+            "guid": "poi:18154"
+            "name": "Freedom Square"
+            "img": "http://farm7.staticflickr.com/6010/6009296353_6c35a6a3ae_s.jpg",
+            "lat": "49.194942",
+            "lng": "16.608533",
+            "perex": "This large and rather quiet square is the heart of the city and a favourite meeting point. See the plague column and original stone clock.",
+            "address": "Náměstí svobody, Brno"
+            "rating": "9",
+            "distance": "236"
+        }
+    ]
+}
+
+
+--
+Tours API
+--
+API responds with a JSON describing available tours in given destination.
+
+GET /tours/{destination_guid}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_code": "",
+    "status_message": "",
+    "data": [
+        {
+            "recommended_trip_id": "4",
+            "image": "http://farm8.staticflickr.com/7006/6533263607_20b945b729_s.jpg",
+            "name": "London with Kids",
+            "description": "What to do with children on a trip to London.",
+            "items": ["poi:448","poi:456"]
+        },
+        {
+            "recommended_trip_id": "6",
+            "image": "http://farm6.staticflickr.com/5124/5380283087_f63257ca6b_s.jpg",
+            "name": "3 Days in London Trip Plan",
+            "description": "A to Z of London's best attractions.",
+            "items": ["poi:448","poi:459","poi:461","poi:523"]
+        }
+    }
+}
+
+
+--
+Trip API
+Client is able to:
+<ul>
+<li>get trip details
+<li>update trip details
+<li>add a new trip
+<li>delete (= set hidden) a trip
+</ul>
+<table>
+<tr><th>name    <td>Name of the trip.
+<tr><th>date_start    <td>Date when the trip starts. Note that this can be NULL if not set.
+<tr><th>days:items    <td>list of comma separated GUIDs to activities in that day. Each activity must have a unique GUID. Client may query a specific GUID data in a different API.
+<tr><th>image_url    <td>Url of thumbnail image if the trip
+<tr><th>image    <td>Complete trip image data including all available sizes and attribution information. Data structure is similar to image api response
+</table>
+Note that a single GUID can be present in multiple days and even multiple times in a single day - e.g. hotels.
+
+Note: In further API versions, there might be more data coming in. Client should ignore keys it does not understand.
+--
+##Unmodified trip
+
+To speed up the communication the API by default only sends the JSON response if the trip data has changed.
+The change is identified by the TRIP_ID, part of which is incremented with every update. Call to GET https://api.tripomatic.com/v1/KEY/trip/TRIP_ID will result in 304 Not Modified header sent back to the client if there is no change.
+
+To request full trip data (e.g. when the client does not have local copy), use the following call: GET https://api.tripomatic.com/v1/KEY/trip/TRIP_ID?sendAlways=true
+GET /trip/{trip_id}
+< 200
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "",
+    "data": {
+        "trip_id": "4f2666cfc62e6#76",
+        "name": "My Trip to London",
+    "destinations": ["city:1456", "region:45689"],
+        "date_start": "2012-04-01",
+    "last_updated": "2012-02-01 14:15:08",
+        "days": [{
+            "items": ["transport:1456", "hotel:45689", "poi:579", "poi:594", "hotel:45689"],
+        "destinations": ["city:1456"]
+        }, {
+            "items": ["hotel:45689", "poi:558", "poi:591", "hotel:45689"],
+        "destinations": ["city:1456"]
+        }, {
+            "items": ["hotel:45689", "poi:599", "c:5994", "tour:930", "hotel:45689"],
+        "destinations": ["city:1456", "region:45689"]
+        }],
+    "image_url": "http://example.com/image.jpg",
+        "image": {
+            "guid": "image:29162",
+            "provider": "panoramio",
+            "author": "cloise",
+            "author_page_url": "http://example.com/image-author/",
+             "photo_page_url": "http://www.example.com/photo/123",
+            "title": "East side",
+            "default": [ ],
+            "internall": "0",
+            "sizes": [
+                {
+                "type": "square",
+                "url": "http://www.example.com/photos/square/123.jpg",
+                "width": "60",
+                "height": "60"
+                },
+                {
+                "type": "small",
+                "url": "http://www.example.com/photos/small/123.jpg",
+                "width": "240",
+                "height": "180"
+                },
+                {
+                "type": "medium",
+                "url": "http://www.example.com/photos/meduim/123.jpg",
+                "width": "500",
+                "height": "375"
+                }
+            ]
+        }
+    }
+}
+
+##Create new trip
+Note that the trip_id is empty (required) and destinations contains guid of the first destination (optional). Client may also include a trip name and date_start (optional). If empty or missing, these are all set to default values. 
+POST /trip/{trip_id}
+> Content-Type: application/json
+{
+    "trip_id": "",
+    "name": "",
+    "destinations": ["city:1456"],
+    "date_start": "",
+    "days": [{
+        "items": ["transport:1", "hotel:45689", "poi:579", "poi:594", "hotel:45689"]
+    }, {
+        "items": ["hotel:45689", "poi:531", "poi:591", "hotel:45689"]
+    }]
+}
+< 201
+< Content-Type: application/json
+{
+    "status": "ok",
+    "status_message": "",
+    "status_code": "CREATED",
+    "data": {
+        "trip_id": "dfgh4d64j35454#1",
+        "name": "My trip to Paris",
+        "destinations": ["city:1456"],
+        "date_start": "NULL",
+        "last_updated": "2012-02-01 14:15:08",
+        "days": [{
+            "items": ["transport:1", "hotel:45689", "poi:579", "poi:594", "hotel:45689"]
+        }, {
+            "items": ["hotel:45689", "poi:531", "poi:591", "hotel:45689"]
+        }],
+        "image_url": "http://example.com/image.jpg",
+        "image": {
+            "guid": "image:29162",
+            "provider": "panoramio",
+            "author": "cloise",
+            "author_page_url": "http://example.com/image-author/",
+             "photo_page_url": "http://www.example.com/photo/123",
+            "title": "East side",
+            "default": [ ],
+            "internall": "0",
+            "sizes": [
+                {
+                "type": "square",
+                "url": "http://www.example.com/photos/square/123.jpg",
+                "width": "60",
+                "height": "60"
+                },
+                {
+                "type": "small",
+                "url": "http://www.example.com/photos/small/123.jpg",
+                "width": "240",
+                "height": "180"
+                },
+                {
+                "type": "medium",
+                "url": "http://www.example.com/photos/meduim/123
+                
