@@ -1,21 +1,31 @@
 HOST: http://www.google.com/
 
---- Sample API v2 www ---
+--- Sample API v2 with long name and description ---
 ---
 Welcome to the our sample API documentation. All comments can be written in (support [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax)
 ---
+
+
+
+
+
 
 --
 Shopping Cart Resources
 The following is a section of resources related to the shopping cart
 --
-List all the products added into your shopping-cart. (comment block again in Markdown)
+List products added into your shopping-cart. (comment block again in Markdown)
 GET /shopping-cart
 < 200
 < Content-Type: application/json
 { "items": [
   { "url": "/shopping-cart/1", "product":"2ZY48XPZ", "quantity": 1, "name": "New socks", "price": 1.25 }
 ] }
+
+
+
+
+
 
 
 Save new products in your shopping cart
@@ -25,6 +35,9 @@ POST /shopping-cart
 < 201
 < Content-Type: application/json
 { "status": "created", "url": "/shopping-cart/2" }
+
+
+
 
 
 -- Payment Resources --
