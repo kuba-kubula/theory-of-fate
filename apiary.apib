@@ -1,6 +1,6 @@
 HOST: http://www.google.com/
 
---- Sample API v2 ---
+--- Sample API v2 (main) ---
 ---
 Welcome to the our sample API documentation. All comments can be written in (support [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax)
 ---
@@ -17,31 +17,18 @@ GET /shopping-cart
   { "url": "/shopping-cart/1", "product":"2ZY48XPZ", "quantity": 1, "name": "New socks", "price": 1.25 }
 ] }
 
-POST /trrrt
+Save new products in your shopping cart
+POST /shopping-cart
 > Content-Type: application/json
-{ "a": "b", "c": 0}
+{ "product":"1AB23ORM", "quantity": 2 }
+< 201
+< Content-Type: application/json
+{ "status": "created", "url": "/shopping-cart/2" }
+
+
+-- Payment Resources --
+This resource allows you to submit payment information to process your *shopping cart* items
+POST /payment
+{ "cc": "12345678900", "cvc": "123", "expiry": "0112" }
 < 200
-{ "status": "ok" }
-
-Testing URL for JSON Schema Validations
-POST /url
-> Content-Type: application/json
-{ "a": "b", "c": 0}
-< 200
-{ "status": "ok" }
-
--- JSON Schema Validations --
-
-POST /url
-{
-    "type": "object",
-    "properties": {
-        "a": {
-            "format": "alphanumeric"
-        },
-        "c": {
-            "type": "integer"
-        }
-    }
-}
-
+{ "receipt": "/payment/receipt/1" }
