@@ -1,13 +1,20 @@
 FORMAT: 1A
 HOST: http://www.google.com
 
-# Notes API
+# Boyard
 Notes API is a *short texts saving* service similar to its physical paper presence on your table.
 
 # Group Notes
 Notes related resources of the **Notes API**
 
 ## Notes Collection [/notes]
+### Info about all Notes [HEAD]
++ Response 200
+
+    + Headers
+    
+            X-Notes-Count: 2
+
 ### List all Notes [GET]
 + Response 200 (application/json)
 
@@ -26,11 +33,20 @@ Notes related resources of the **Notes API**
 
         { "id": 3, "title": "Buy cheese and bread for breakfast." }
 
-## Note [/notes/{id}]
++ Request (text/xml)
+
+        <a><note title="Buy cheese and bread for breakfast." /></a>
+
++ Response 201 (text/xml)
+
+        <a><note id="3" title="Buy cheese and bread for breakfast." /></a>
+
+## Note [/notes/{id}/{?since}]
 A single Note object with all its details
 
 + Parameters
     + id (required, number, `1`) ... Numeric `id` of the Note to perform action with. Has example value.
+    + since (optional, string) ... From time in format `YYYY-MM-DD`
 
 ### Retrieve a Note [GET]
 + Response 200 (application/json)
