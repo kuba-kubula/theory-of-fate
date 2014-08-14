@@ -61,3 +61,37 @@ A single Note object with all its details
 
 ### Remove a Note [DELETE]
 + Response 204
+
+## Tool [/tool/{id}]
+
+### Check the tools [GET]
+
++ Request
+
+    + Header
+    
+            X-Custom-Variant: 1
+
++ Response 200 (text/plain)
+
+        Body-response for Variant 1
+
++ Request
+
+    + Header
+    
+            X-Custom-Variant: 2
+
++ Response 200 (text/plain)
+
+        Body-response for Variant 2
+
++ Request
+
+    + Header
+    
+            X-Custom-Variant: 3
+
++ Response 200 (text/plain)
+
+        Body-response for Variant 3
